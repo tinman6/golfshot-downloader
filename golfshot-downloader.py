@@ -2,37 +2,44 @@
 
 from html.parser import HTMLParser
 import json
+import re
 import requests
-import pprint
 
 
-class ScorecardParser(HTMLParser):
+class RoundParser(HTMLParser):
   def handle_data(self, data):
     # the golfshot model is available in a script block
     if 'Golfshot.Applications.Scorecard' in data:
-      for line in data.splitlines():
-        if 'Golfshot.Applications.Scorecard' in line:
-          # counting chars is not great, but simpliest
-          model = json.loads(line[70:-57])
-          self.results = model
+      model = re.search(r"(?<=ReactDOM.hydrate\(React.createElement\(Golfshot.Applications.Scorecard, )(.*)(?=\), document.getElementById)", data).group()
+      self.results = json.loads(model)
 
 
 class CourseParser(HTMLParser):
   def handle_data(self, data):
     if 'Golfshot.Applications.CourseScorecard' in data:
-      for line in data.splitlines():
-        if 'Golfshot.Applications.CourseScorecard' in line:
-          model = json.loads(line[76:-59])
-          self.results = model
+      model = re.search(r'(?<=ReactDOM.hydrate\(React.createElement\(Golfshot.Applications.CourseScorecard, )(.*)(?=\), document.getElementById)', data).group()
+      self.results = json.loads(model)
 
 
-with open('mocks/scorecard.html') as mock_scorecard:
-  p = ScorecardParser()
-  p.feed(mock_scorecard.read())
-  pprint.pprint(p.results)
+def download_round(url, session):
+  res = session.get(url)
+  p = RoundParser()
+  p.feed(res.text)
+  with open('data/rounds/%s.json' % p.results['roundGroupId'], 'w') as f:
+    json.dump(p.results, f)
 
 
-with open('mocks/course.html') as mock_course:
+def download_course(url, session):
+  res = session.get(url)
   p = CourseParser()
-  p.feed(mock_course.read())
-  pprint.pprint(p.results)
+  p.feed(res.text)
+
+  course_id = url.split('/')[-1]
+  course_uuid = p.results['source'].split('/')[-2]
+  scorecard = session.get(p.results['source']).json()['scorecard']  # remove unused siblings
+
+  with open('data/courses/%s.json' % course_id, 'w') as f:
+    ret = {'courseId': course_id,
+           'courseUuid': course_uuid,
+           'scorecard': scorecard}
+    json.dump(ret, f)

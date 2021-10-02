@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import argparse
 from html.parser import HTMLParser
 import json
 import re
@@ -43,3 +44,23 @@ def download_course(url, session):
            'courseUuid': course_uuid,
            'scorecard': scorecard}
     json.dump(ret, f)
+
+
+
+
+
+parser = argparse.ArgumentParser(description='Download GolfShot data')
+parser.add_argument('username', help='Username for GolfShot account')
+parser.add_argument('password', help='Password for GolfShot account')
+args = parser.parse_args()
+
+
+GOLFSHOT_URL = 'https://play.golfshot.com'
+
+with requests.Session() as session:
+  signin = session.post('%s/signin' % GOLFSHOT_URL,
+                        data={'Email': args.username,
+                              'Password': args.password})
+
+  download_round('ROUND_URL', session)
+  download_course('COURSE_URL', session)

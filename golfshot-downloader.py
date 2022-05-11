@@ -3,6 +3,7 @@
 import argparse
 from bs4 import BeautifulSoup
 from html.parser import HTMLParser
+from lxml import etree
 import json
 import re
 import requests
@@ -73,6 +74,7 @@ def download_rounds(session, profile_id, last_round=None):
       if round_id == last_round:
         download_rounds = False
         break
+      print('Downloading %s...' % round_id)
       download_round(session, profile_id, round_id)
 
     params['p'] += 1
@@ -89,7 +91,14 @@ parser.add_argument('--until', help='Download rounds until specified round (by d
 args = parser.parse_args()
 
 with requests.Session() as session:
+  tokenRequest = session.get(f'{GOLFSHOT_URL}/signin')
+  parser = etree.HTMLParser()
+  tree = etree.fromstring(tokenRequest.text, parser)
+  verificationToken = tree.xpath('//form//input[@name="__RequestVerificationToken"]/@value')[0]
   signin = session.post(f'{GOLFSHOT_URL}/signin',
                         data={'Email': args.username,
-                              'Password': args.password})
+                              'Password': args.password,
+                              '__RequestVerificationToken': verificationToken,
+                        })
+
   download_rounds(session, args.profile_id, args.until)
